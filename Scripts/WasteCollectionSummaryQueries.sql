@@ -71,6 +71,7 @@ SET
     authority = 'City of London'
 WHERE authority = 'of London';
 
+
 -- ##################################################################
 -- Remove special characters from material group
 
@@ -108,6 +109,9 @@ WHERE material_group LIKE CONCAT('%', @character13, '%')
 
 
 -- Transform Periods
+
+SELECT * FROM dataschoolprojectv2.main_waste_collection_23_25
+WHERE period = 'Period';
 
 DELETE FROM dataschoolprojectv2.main_waste_collection_23_25
 WHERE period = 'Period';
@@ -153,8 +157,7 @@ SET period_end = STR_TO_DATE(
 DESCRIBE dataschoolprojectv2.main_waste_collection_23_25;
 
 ALTER TABLE dataschoolprojectv2.main_waste_collection_23_25
-#ADD COLUMN postcode_district VARCHAR(10);
-MODIFY COLUMN postcode_district VARCHAR(10);
+ADD COLUMN postcode_district VARCHAR(10);
 
 SELECT
     UPPER(TRIM(facility_postCode)) AS facility_postCode,
@@ -187,59 +190,157 @@ WHERE facility_postCode IS NOT NULL
 SELECT facility_postCode,postcode_district FROM dataschoolprojectv2.main_waste_collection_23_25
 WHERE postcode_district  <> '';
 
+-- Adding treatment group field to simplify more Tableau 
+
+ALTER TABLE dataschoolprojectv2.main_waste_collection_23_25
+ADD COLUMN treatment_group VARCHAR(250);
+
+-- There is a problem with total tonnesin Financial year 2017/18, for some reason they added a decimal part of the value
+
+WITH update_tonnes AS (
+	SELECT
+		total_tonnes
+	FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE period_start >= '2017-04-01'
+		AND period_start < '2018-04-01'
+)
+UPDATE dataschoolprojectv2.main_waste_collection_23_25
+SET total_tonnes = total_tonnes * 10
+WHERE period_start >= '2017-04-01'
+	AND period_start < '2018-04-01' 
+    AND treatment_group = "Landfill";
+
+UPDATE dataschoolprojectv2.main_waste_collection_23_25
+#SET total_tonnes = total_tonnes * 100
+SET total_tonnes = total_tonnes / 100 ##only NULL back to initial stage
+WHERE period_start >= '2017-04-01'
+	AND period_start < '2018-04-01' 
+    AND treatment_group = "Incineration"
+    AND material_group IS NULL;
+    
+UPDATE dataschoolprojectv2.main_waste_collection_23_25
+SET total_tonnes = total_tonnes * 100 #in material group it is distibilising
+WHERE period_start >= '2017-04-01'
+	AND period_start < '2018-04-01' 
+    AND treatment_group = "Incineration"
+    AND material_group IS NOT NULL;    
+    
 -- ############################EXPORT DATA TO CSV FILE#######################################
 -- Export Data to CSV file for Tableau
+-- We filter only the records that belong to incineration and recycling
 
 SELECT
-	'waste_processor_id',
-	'authority', 
-	'authority_id',
-	'period_id',
+    'waste_processor_id',
+    'authority', 
+    'authority_id',
+    'period_id',
     'period_start',
-	'period_end',
-	'waste_stream_type_id',
-	'waste_stream_type',
-	'facility_type_id',
-	'facility_type',
-	'national_facility_id',
-	'facility_name',
-	'facility_postCode',    
-	'total_tonnes',
-	'material_group',
-	'material_id',
-	'material',
-	'tonnes_by_material',
+    'period_end',
+    'waste_stream_type_id',
+    'waste_stream_type',
+    'facility_type_id',
+    'facility_type',
+    'treatment_group',
+    'national_facility_id',
+    'facility_name',
+    'facility_postCode',    
+    'total_tonnes',
+    'material_group',
+    'material_id',
+    'material',
+    'tonnes_by_material',
     'postCode_district'
+
 UNION ALL
+
 SELECT
-	waste_processor_id,
-	authority, 
-	authority_id,
-	period_id,
+    waste_processor_id,
+    authority, 
+    authority_id,
+    period_id,
     period_start,
-	period_end,
-	waste_stream_type_id,
-	waste_stream_type,
-	facility_type_id,
-	facility_type,
-	national_facility_id,
-	facility_name,
-	facility_postCode,    
-	total_tonnes,
-	material_group,
-	material_id,
-	material,
-	tonnes_by_material,
+    period_end,
+    waste_stream_type_id,
+    waste_stream_type,
+    facility_type_id,
+    facility_type,
+
+    CASE
+        WHEN facility_type IN (
+            'Incineration with energy recovery',
+            'Incineration without energy recovery',
+            'Advanced Thermal Treatment'
+        ) THEN 'Incineration'
+
+        WHEN facility_type IN (
+            'Inert landfill',
+			'Non-hazardous landfill',
+			'Hazardous landfill'
+        ) THEN 'Landfill'
+        
+        WHEN facility_type IN (
+            'Reprocessor - recycling (qu19)',
+			'Exporter - recycling (qu19)',
+            'Reuse (qu35)'
+        ) THEN 'Recycling'
+    END AS treatment_group,
+
+    national_facility_id,
+    facility_name,
+    facility_postCode,    
+    total_tonnes,
+    material_group,
+    material_id,
+    material,
+    tonnes_by_material,
     postcode_district
+
 FROM dataschoolprojectv2.main_waste_collection_23_25
+
+WHERE facility_type IN (
+    'Incineration with energy recovery',
+    'Incineration without energy recovery',
+    'Advanced Thermal Treatment',
+    'Inert landfill',
+	'Non-hazardous landfill',
+	'Hazardous landfill',
+	'Reprocessor - recycling (qu19)',
+	'Exporter - recycling (qu19)',
+	'Reuse (qu35)'
+)
+
 INTO OUTFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/ExportFromDBWasteCollectionSummary.csv'
 FIELDS TERMINATED BY ','
 ENCLOSED BY '"'
 LINES TERMINATED BY '\n';
 
 
-
 -- #################################QUERIES RELATED TO SEASONAL MATERIAL PERIODS #######################################
+
+UPDATE dataschoolprojectv2.main_waste_collection_23_25
+SET treatment_group =
+    CASE
+        WHEN facility_type IN (
+            'Incineration with energy recovery',
+            'Incineration without energy recovery',
+            'Advanced Thermal Treatment'
+        )
+        THEN 'Incineration'
+
+        WHEN facility_type IN (
+            'Inert landfill',
+            'Non-hazardous landfill',
+            'Hazardous landfill'
+        )
+        THEN 'Landfill'
+
+		WHEN facility_type IN (
+			'Reprocessor - recycling (qu19)',
+			'Exporter - recycling (qu19)',
+			'Reuse (qu35)'
+        )
+        THEN 'Recycling'
+    END;
 
 WITH cleaned AS (
     SELECT
@@ -635,9 +736,7 @@ FROM dataschoolprojectv2.main_waste_collection_23_25
 WHERE period_start >= '2024-04-01'
   AND period_start < '2025-04-01'
   AND national_facility_id != 0
-  AND facility_type = "Inert landfill"
-  OR facility_type = "Non-hazardous landfill"
-  OR facility_type = "Hazardous landfill";
+  AND treatment_group = "Landfill";
   
  SELECT
     SUM(total_tonnes) AS total_tonnes,
@@ -825,6 +924,8 @@ WHERE material_group IS NOT NULL AND facility_type_id != 0
 GROUP BY financial_year
 ORDER BY financial_year;
 
+-- residual waste tonnes
+
 SELECT
     CASE
         WHEN MONTH(period_start) >= 4 THEN
@@ -860,6 +961,8 @@ WHERE material_group IS NOT NULL
 GROUP BY financial_year
 ORDER BY financial_year;
 
+-- Residual waste
+
 SELECT
     CASE
         WHEN MONTH(period_start) >= 4 THEN
@@ -879,12 +982,12 @@ SELECT
     SUM(
         CASE
             WHEN waste_stream_type = 'Residual waste'
-            THEN tonnes_by_material
+            THEN total_tonnes
             ELSE 0
         END
     ) AS residual_waste_tonnes,
 
-    SUM(tonnes_by_material) AS total_tonnes
+    SUM(total_tonnes) AS total_tonnes
 
 FROM dataschoolprojectv2.main_waste_collection_23_25
 
@@ -984,7 +1087,8 @@ GROUP BY
     waste_processor_id,
     waste_stream_id;
     
--- total tonnage per financial year TOO LOW
+-- incineration with energy recovery progression
+
 SELECT
     financial_year,
     SUM(wfh_tonnes) AS total_waste_from_households
@@ -1024,7 +1128,8 @@ FROM (
 ) x
 
 GROUP BY financial_year
-ORDER BY financial_year;    
+ORDER BY financial_year;
+
 
 
 SELECT
@@ -1096,7 +1201,7 @@ SELECT
     waste_stream_type,
     facility_type,
     COUNT(*) AS number_of_records,
-    ROUND(SUM(tonnes_by_material), 2) AS tonnes_by_material
+    ROUND(SUM(total_tonnes), 2) AS total_tonnes
 FROM dataschoolprojectv2.main_waste_collection_23_25
 WHERE waste_stream_type IS NOT NULL
   AND facility_type IS NOT NULL
@@ -1106,7 +1211,7 @@ GROUP BY
     facility_type
 ORDER BY
     waste_stream_type,
-    tonnes_by_material DESC;
+    total_tonnes DESC;
     
 -- Facility types only connected to residual waste
 SELECT
@@ -1203,6 +1308,8 @@ GROUP BY
 ORDER BY
     facility_postCode;
 
+-- incineration by Post code
+
 SELECT
     UPPER(TRIM(facility_postCode)) AS facility_postCode,
     SUBSTRING_INDEX(UPPER(TRIM(facility_postCode)), ' ', 1) AS postcode_district,
@@ -1229,6 +1336,8 @@ GROUP BY
     SUBSTRING_INDEX(UPPER(TRIM(facility_postCode)), ' ', 1)
 ORDER BY
     facility_postCode;
+    
+    
 
 SELECT
     national_facility_id,
@@ -1246,7 +1355,7 @@ SELECT
     facility_name,
     facility_type,
     COUNT(*) AS number_of_records,
-    ROUND(SUM(tonnes_by_material), 2) AS total_tonnes
+    ROUND(SUM(total_tonnes), 2) AS total_tonnes
 FROM dataschoolprojectv2.main_waste_collection_23_25
 WHERE facility_type IS NOT NULL
   AND (
@@ -1268,4 +1377,732 @@ SELECT
     facility_address
 FROM dataschoolprojectv2.main_waste_collection_23_25
 where authority = "*";    
+
+
+-- *************************************************************
+-- Analysis for 3rd version focus on incineration and landfill
+
+-- Adding Treatment groups
+
+SELECT
+    period_id,
+    period_start,
+    period_end,
+    'Incineration' AS treatment_group,
+    SUM(total_tonnes) AS total_incineration_tonnes
+FROM dataschoolprojectv2.main_waste_collection_23_25
+WHERE facility_type IN (
+    'Incineration with energy recovery',
+    'Incineration without energy recovery',
+    'Advanced Thermal Treatment'
+)
+GROUP BY
+    period_id,
+    period_start,
+    period_end
+ORDER BY
+    period_start;
+
     
+-- Add quarter progression in treatment_group
+-- gorka
+
+WITH incineration_by_period AS (
+    SELECT
+        period_id,
+        period_start,
+        period_end,
+        SUM(total_tonnes) AS incineration_tonnes
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE facility_type IN (
+        'Incineration with energy recovery',
+        'Incineration without energy recovery',
+        'Advanced Thermal Treatment'
+    )
+    GROUP BY
+        period_id,
+        period_start,
+        period_end
+)
+
+SELECT
+    period_id,
+    period_start,
+    period_end,
+    incineration_tonnes,
+
+    LAG(incineration_tonnes) OVER (
+        ORDER BY period_start
+    ) AS previous_quarter_tonnes,
+
+    incineration_tonnes
+        - LAG(incineration_tonnes) OVER (
+            ORDER BY period_start
+        ) AS tonnes_change,
+
+    ROUND(
+        (
+            incineration_tonnes
+            - LAG(incineration_tonnes) OVER (
+                ORDER BY period_start
+            )
+        )
+        /
+        LAG(incineration_tonnes) OVER (
+            ORDER BY period_start
+        ) * 100,
+        2
+    ) AS percentage_change
+
+FROM incineration_by_period
+ORDER BY period_start;    
+    
+-- YEAR progression
+
+WITH incineration_by_year AS (
+    SELECT
+        YEAR(period_start) AS year_period,
+        SUM(tonnes_by_material) AS incineration_tonnes
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE facility_type IN (
+        'Incineration with energy recovery',
+        'Incineration without energy recovery',
+        'Advanced Thermal Treatment'
+    )
+    GROUP BY YEAR(period_start)
+)
+
+SELECT
+    year_period,
+    incineration_tonnes,
+
+    LAG(incineration_tonnes) OVER (
+        ORDER BY year_period
+    ) AS previous_year_tonnes,
+
+    incineration_tonnes
+        - LAG(incineration_tonnes) OVER (
+            ORDER BY year_period
+        ) AS tonnes_change,
+
+    ROUND(
+        (
+            incineration_tonnes
+            - LAG(incineration_tonnes) OVER (ORDER BY year_period)
+        )
+        /
+        LAG(incineration_tonnes) OVER (ORDER BY year_period)
+        * 100,
+        2
+    ) AS percentage_change
+
+FROM incineration_by_year
+ORDER BY year_period;
+
+-- WITH tonnes_from_WfH_sources
+
+WITH incineration_by_year AS (
+    SELECT
+        YEAR(period_start) AS year_period,
+        SUM(tonnes_from_WfH_sources) AS tonnes_from_WfH_sources
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE facility_type IN (
+        'Incineration with energy recovery',
+        'Incineration without energy recovery',
+        'Advanced Thermal Treatment'
+    )
+    GROUP BY YEAR(period_start)
+)
+
+SELECT
+    year_period,
+    tonnes_from_WfH_sources,
+
+    LAG(tonnes_from_WfH_sources) OVER (
+        ORDER BY year_period
+    ) AS previous_year_tonnes,
+
+    tonnes_from_WfH_sources
+        - LAG(tonnes_from_WfH_sources) OVER (
+            ORDER BY year_period
+        ) AS tonnes_change,
+
+    ROUND(
+        (
+            tonnes_from_WfH_sources
+            - LAG(tonnes_from_WfH_sources) OVER (ORDER BY year_period)
+        )
+        /
+        LAG(tonnes_from_WfH_sources) OVER (ORDER BY year_period)
+        * 100,
+        2
+    ) AS percentage_change
+
+FROM incineration_by_year
+ORDER BY year_period;
+
+-- YEARLY landfill
+
+WITH landfill_by_year AS (
+    SELECT
+        YEAR(period_start) AS year_period,
+        SUM(tonnes_by_material) AS landfill_tonnes
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE facility_type IN (
+		'Inert landfill',
+		'Non-hazardous landfill',
+		'Hazardous landfill'
+	)
+    GROUP BY YEAR(period_start)
+)
+
+SELECT
+    year_period,
+    landfill_tonnes,
+
+    LAG(landfill_tonnes) OVER (
+        ORDER BY year_period
+    ) AS previous_year_tonnes,
+
+    landfill_tonnes
+        - LAG(landfill_tonnes) OVER (
+            ORDER BY year_period
+        ) AS tonnes_change,
+
+    ROUND(
+        (
+            landfill_tonnes
+            - LAG(landfill_tonnes) OVER (
+                ORDER BY year_period
+            )
+        )
+        /
+        LAG(landfill_tonnes) OVER (
+            ORDER BY year_period
+        ) * 100,
+        2
+    ) AS percentage_change
+
+FROM landfill_by_year
+ORDER BY year_period;
+
+-- FINANCIAL YEAR
+
+WITH landfill_by_financial_year AS (
+    SELECT
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END AS financial_year,
+
+        SUM(total_tonnes) AS landfill_tonnes
+
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+
+    WHERE facility_type IN (
+		'Inert landfill',
+		'Non-hazardous landfill',
+		'Hazardous landfill'
+	)
+
+    GROUP BY
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END
+)
+
+SELECT
+    financial_year,
+    landfill_tonnes,
+
+    LAG(landfill_tonnes) OVER (
+        ORDER BY financial_year
+    ) AS previous_year_tonnes,
+
+    landfill_tonnes
+        - LAG(landfill_tonnes) OVER (
+            ORDER BY financial_year
+        ) AS tonnes_change,
+
+    ROUND(
+        (
+            landfill_tonnes
+            - LAG(landfill_tonnes) OVER (
+                ORDER BY financial_year
+            )
+        )
+        /
+        LAG(landfill_tonnes) OVER (
+            ORDER BY financial_year
+        ) * 100,
+        2
+    ) AS percentage_change
+
+FROM landfill_by_financial_year
+ORDER BY financial_year;
+
+-- Incineration + Financial year
+
+WITH incineration_by_year AS (
+    SELECT
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END AS financial_year,
+        SUM(total_tonnes) AS incineration_tonnes
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE facility_type IN (
+        'Incineration with energy recovery',
+        'Incineration without energy recovery',
+        'Advanced Thermal Treatment'
+    ) AND waste_stream_type = 'Residual waste'
+    GROUP BY
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END
+)
+
+SELECT
+    financial_year,
+    incineration_tonnes,
+
+    LAG(incineration_tonnes) OVER (
+        ORDER BY financial_year
+    ) AS previous_year_tonnes,
+
+    incineration_tonnes
+        - LAG(incineration_tonnes) OVER (
+            ORDER BY financial_year
+        ) AS tonnes_change,
+
+    ROUND(
+        (
+            incineration_tonnes
+            - LAG(incineration_tonnes) OVER (ORDER BY financial_year)
+        )
+        /
+        LAG(incineration_tonnes) OVER (ORDER BY financial_year)
+        * 100,
+        2
+    ) AS percentage_change
+
+FROM incineration_by_year
+ORDER BY financial_year;   
+
+
+-- check where comes the incineration spike 
+
+SELECT
+    facility_name,
+    facility_type,
+    period_start,
+    ROUND(SUM(tonnes_by_material), 2) AS tonnes
+FROM dataschoolprojectv2.main_waste_collection_23_25
+WHERE facility_type IN (
+    'Incineration with energy recovery',
+    'Incineration without energy recovery',
+    'Advanced Thermal Treatment'
+)
+AND period_start BETWEEN '2020-10-01' AND '2021-06-30'
+GROUP BY
+    facility_name,
+    facility_type,
+    period_start
+ORDER BY
+    period_start,
+    tonnes DESC;
+ 
+ SELECT
+    authority,
+    authority_id,
+    waste_processor_id,
+    national_facility_id,
+    facility_name,
+    facility_type,
+    waste_stream_type,
+    material,
+    total_tonnes
+FROM dataschoolprojectv2.main_waste_collection_23_25
+WHERE period_start = '2021-04-01'
+  AND facility_name = ''
+  AND facility_type = 'Incineration with energy recovery'
+ORDER BY tonnes_by_material DESC;
+
+SELECT
+    YEAR(period_start),
+    LAG(SUM(total_tonnes)) OVER(ORDER BY YEAR(period_start)) AS previous_year_tonnes,
+    SUM(total_tonnes) AS tonnes,
+    LAG(SUM(total_tonnes)) OVER(ORDER BY YEAR(period_start)) - SUM(total_tonnes) AS difference,
+    LAG(SUM(tonnes_by_material)) OVER(ORDER BY YEAR(period_start)) AS previous_year_tonnes_material,
+    SUM(tonnes_by_material) AS tonnes_material,
+    LAG(SUM(tonnes_by_material)) OVER(ORDER BY YEAR(period_start)) - SUM(tonnes_by_material) AS difference_material
+FROM dataschoolprojectv2.main_waste_collection_23_25
+WHERE facility_type IN (
+    'Incineration with energy recovery',
+    'Incineration without energy recovery',
+    'Advanced Thermal Treatment'
+)
+AND waste_stream_type = 'Residual waste'
+GROUP BY
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END;
+
+SELECT
+    waste_processor_id,
+    waste_stream_id,
+    period_start,
+    authority,
+    facility_type,
+    COUNT(*) AS number_of_rows,
+    MIN(total_tonnes) AS min_total_tonnes,
+    MAX(total_tonnes) AS max_total_tonnes,
+    SUM(total_tonnes) AS summed_total_tonnes
+
+FROM dataschoolprojectv2.main_waste_collection_23_25
+
+WHERE facility_type IN (
+    'Incineration with energy recovery',
+    'Incineration without energy recovery',
+    'Advanced Thermal Treatment'
+)
+AND waste_stream_type = 'Residual waste'
+
+GROUP BY
+    waste_processor_id,
+    waste_stream_id,
+    period_start,
+    authority,
+    facility_type
+
+ORDER BY number_of_rows DESC;
+
+WITH deduplicated_landfill AS (
+    SELECT
+        waste_processor_id,
+        waste_stream_id,
+        YEAR(period_start) AS year,
+        authority_id,
+        facility_type,
+        MAX(total_tonnes) AS total_tonnes
+
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+
+    WHERE facility_type IN (
+        'Inert landfill',
+		'Non-hazardous landfill',
+        'Hazardous landfill'
+    )
+    AND waste_stream_type = 'Residual waste'
+
+    GROUP BY
+        waste_processor_id,
+        waste_stream_id,
+        YEAR(period_start),
+        authority_id,
+        facility_type
+)
+
+SELECT
+    year,
+    SUM(total_tonnes) AS landfill_tonnes
+
+FROM deduplicated_landfill
+
+GROUP BY year
+ORDER BY year;
+
+WITH deduplicated_landfill AS (
+    SELECT
+        waste_processor_id,
+        waste_stream_id,
+        authority_id,
+        facility_type,
+
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END AS financial_year,
+
+        MAX(total_tonnes) AS total_tonnes
+
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+
+    WHERE facility_type IN (
+		'Inert landfill',
+		'Non-hazardous landfill',
+        'Hazardous landfill'
+    )
+    AND waste_stream_type = 'Residual waste'
+    #AND material_group NOT REGEXP '^[0-9]+$'
+    
+    GROUP BY
+        waste_processor_id,
+        waste_stream_id,
+        authority_id,
+        facility_type,
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END
+)
+
+SELECT
+    financial_year,
+    ROUND(SUM(total_tonnes), 2) AS landfill_tonnes
+
+FROM deduplicated_landfill
+
+GROUP BY financial_year
+ORDER BY financial_year;
+
+
+WITH deduplicated_incineration AS (
+    SELECT
+        waste_processor_id,
+        waste_stream_id,
+        authority_id,
+        facility_type,
+
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END AS financial_year,
+
+        MAX(total_tonnes) AS total_tonnes
+
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+
+    WHERE facility_type IN (
+        'Incineration with energy recovery',
+        'Incineration without energy recovery',
+        'Advanced Thermal Treatment'
+    )
+    AND waste_stream_type = 'Residual waste'
+    AND material_group NOT REGEXP '^[0-9]+$'
+    
+    GROUP BY
+        waste_processor_id,
+        waste_stream_id,
+        authority_id,
+        facility_type,
+        CASE
+            WHEN MONTH(period_start) >= 4 THEN
+                CONCAT(
+                    YEAR(period_start),
+                    '/',
+                    RIGHT(YEAR(period_start) + 1, 2)
+                )
+            ELSE
+                CONCAT(
+                    YEAR(period_start) - 1,
+                    '/',
+                    RIGHT(YEAR(period_start), 2)
+                )
+        END
+)
+
+SELECT
+    financial_year,
+    ROUND(SUM(total_tonnes), 2) AS incineration_tonnes
+
+FROM deduplicated_incineration
+
+GROUP BY financial_year
+ORDER BY financial_year;
+
+SELECT
+    treatment_group,
+    COUNT(*) AS rows_count,
+    COUNT(DISTINCT authority_id) AS authorities,
+    COUNT(DISTINCT waste_processor_id) AS processors,
+    COUNT(DISTINCT waste_stream_id) AS waste_streams,
+    ROUND(SUM(total_tonnes), 0) AS raw_total_tonnes
+
+FROM dataschoolprojectv2.main_waste_collection_23_25
+
+WHERE treatment_group = "Landfill"
+    OR treatment_group = 'Incineration'
+    AND waste_stream_type = 'Residual waste'
+	AND (period_start >= '2017-04-01'
+	AND period_start < '2018-04-01')
+GROUP BY treatment_group;
+
+
+
+-- creating a view
+
+CREATE OR REPLACE VIEW dataschoolprojectv2.vw_residual_treatment AS
+
+WITH deduplicated AS (
+
+    SELECT
+        waste_processor_id,
+        waste_stream_id,
+        authority_id,
+        period_start,
+
+        CASE
+            WHEN facility_type IN (
+                'Incineration with energy recovery',
+                'Incineration without energy recovery',
+                'Advanced Thermal Treatment'
+            ) THEN 'Incineration'
+
+            WHEN facility_type IN (
+                'Inert landfill',
+                'Non-hazardous landfill',
+                'Hazardous landfill'
+            ) THEN 'Landfill'
+        END AS treatment_group,
+
+        MAX(total_tonnes) AS total_tonnes
+
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+
+    WHERE waste_stream_type = 'Residual waste'
+      AND facility_type IN (
+          'Incineration with energy recovery',
+          'Incineration without energy recovery',
+          'Advanced Thermal Treatment',
+          'Inert landfill',
+          'Non-hazardous landfill',
+          'Hazardous landfill'
+      )
+
+    GROUP BY
+        waste_processor_id,
+        waste_stream_id,
+        authority_id,
+        period_start,
+        CASE
+            WHEN facility_type IN (
+                'Incineration with energy recovery',
+                'Incineration without energy recovery',
+                'Advanced Thermal Treatment'
+            ) THEN 'Incineration'
+
+            WHEN facility_type IN (
+                'Inert landfill',
+                'Non-hazardous landfill',
+                'Hazardous landfill'
+            ) THEN 'Landfill'
+        END
+)
+
+SELECT
+    period_start,
+
+    CASE
+        WHEN MONTH(period_start) >= 4 THEN
+            CONCAT(
+                YEAR(period_start),
+                '/',
+                RIGHT(YEAR(period_start) + 1, 2)
+            )
+        ELSE
+            CONCAT(
+                YEAR(period_start) - 1,
+                '/',
+                RIGHT(YEAR(period_start), 2)
+            )
+    END AS financial_year,
+
+    treatment_group,
+
+    SUM(total_tonnes) AS treatment_tonnes
+
+FROM deduplicated
+
+GROUP BY
+    period_start,
+    treatment_group;
+
+SELECT *
+FROM dataschoolprojectv2.vw_residual_treatment
+ORDER BY period_start, treatment_group;
+
+
