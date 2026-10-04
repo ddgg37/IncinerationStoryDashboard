@@ -203,6 +203,9 @@ SET period_end = STR_TO_DATE(
 ALTER TABLE dataschoolprojectv2.main_waste_collection_23_25
 ADD COLUMN postcode_district VARCHAR(10);
 
+ALTER TABLE dataschoolprojectv2.main_waste_collection_23_25
+ADD COLUMN region VARCHAR(100);
+
 UPDATE dataschoolprojectv2.main_waste_collection_23_25
 SET postcode_district =
     SUBSTRING_INDEX(UPPER(TRIM(facility_postCode)), ' ', 1)
@@ -213,6 +216,23 @@ WHERE facility_postCode IS NOT NULL
         UPPER(TRIM(facility_postCode)),
         '^[A-Z]{1,2}[0-9][0-9A-Z]?[[:space:]][0-9][A-Z]{2}$'
       );
+
+SET SESSION max_execution_time = 0;
+SET SESSION wait_timeout = 60000;
+SET SESSION interactive_timeout = 60000;
+
+-- Set lock wait timeout to 5 minutes (300 seconds)
+SET SESSION innodb_lock_wait_timeout = 300;
+
+UPDATE dataschoolprojectv2.main_waste_collection_23_25 wc
+JOIN dataschoolprojectv2.main_districts d
+  ON d.postcode = wc.postcode_district 
+SET wc.region = COALESCE(d.region, 'Unknown')
+WHERE wc.region IS NOT NULL; 
+#LIMIT 10000;
+
+SELECT wc.id FROM dataschoolprojectv2.main_waste_collection_23_25 wc;
+
       
 -- Adding treatment group field to simplify data in Tableau 
 
