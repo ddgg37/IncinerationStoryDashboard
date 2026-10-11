@@ -218,11 +218,21 @@ WHERE facility_postCode IS NOT NULL
       );
 
 SET SESSION max_execution_time = 0;
-SET SESSION wait_timeout = 60000;
-SET SESSION interactive_timeout = 60000;
+SET SESSION wait_timeout = 600;
+SET SESSION interactive_timeout = 600;
 
 -- Set lock wait timeout to 5 minutes (300 seconds)
-SET SESSION innodb_lock_wait_timeout = 300;
+SET SESSION innodb_lock_wait_timeout = 6000;
+
+CREATE INDEX idx_wc_postcode_district
+ON dataschoolprojectv2.main_waste_collection_23_25 (postcode_district);
+
+CREATE INDEX idx_wc_region
+ON dataschoolprojectv2.main_waste_collection_23_25 (region);
+
+CREATE INDEX idx_d_postcode
+ON dataschoolprojectv2.main_districts (postcode);
+
 
 UPDATE dataschoolprojectv2.main_waste_collection_23_25 wc
 JOIN dataschoolprojectv2.main_districts d
@@ -230,6 +240,18 @@ JOIN dataschoolprojectv2.main_districts d
 SET wc.region = COALESCE(d.region, 'Unknown')
 WHERE wc.region IS NOT NULL; 
 #LIMIT 10000;
+
+UPDATE dataschoolprojectv2.main_waste_collection_23_25 wc
+JOIN dataschoolprojectv2.main_districts d 
+  ON d.postcode = wc.postcode_district
+JOIN (
+    SELECT id 
+    FROM dataschoolprojectv2.main_waste_collection_23_25
+    WHERE postcode_district IS NOT NULL 
+      AND region IS NULL
+    LIMIT 5000 -- Adjust your chunk size here
+) batch ON wc.id = batch.id
+SET wc.region = COALESCE(d.region, 'Unknown');
 
 SELECT wc.id FROM dataschoolprojectv2.main_waste_collection_23_25 wc;
 
@@ -382,6 +404,82 @@ FIELDS TERMINATED BY ','
 ENCLOSED BY '"'
 LINES TERMINATED BY '\n';      
       
+##----SHORT VERSION
+
+SELECT
+    'authority', 
+    'period',
+    'period_start',
+    'period_end',
+    'waste_stream_type',
+    'facility_type',
+    'treatment_group',
+    'national_facility_id',
+    'facility_name',
+    'facility_postCode',    
+    'total_tonnes',
+    'material_group',
+    'material',
+    'tonnes_by_material',
+    'postCode_district'
+
+UNION ALL
+
+SELECT
+    authority,
+    period,
+    period_start,
+    period_end,
+    waste_stream_type,
+    facility_type,
+
+    CASE
+        WHEN facility_type IN (
+            'Incineration with energy recovery',
+            'Incineration without energy recovery',
+            'Advanced Thermal Treatment'
+        ) THEN 'Incineration'
+
+        WHEN facility_type IN (
+            'Inert landfill',
+			'Non-hazardous landfill',
+			'Hazardous landfill'
+        ) THEN 'Landfill'
+        
+        WHEN facility_type IN (
+            'Reprocessor - recycling (qu19)',
+			'Exporter - recycling (qu19)',
+            'Reuse (qu35)'
+        ) THEN 'Recycling'
+    END AS treatment_group,
+
+    national_facility_id,
+    facility_name,
+    facility_postCode,    
+    total_tonnes,
+    material_group,
+    material,
+    tonnes_by_material,
+    postcode_district
+
+FROM dataschoolprojectv2.main_waste_collection_23_25
+
+WHERE facility_type IN (
+    'Incineration with energy recovery',
+    'Incineration without energy recovery',
+    'Advanced Thermal Treatment',
+    'Inert landfill',
+	'Non-hazardous landfill',
+	'Hazardous landfill',
+	'Reprocessor - recycling (qu19)',
+	'Exporter - recycling (qu19)',
+	'Reuse (qu35)'
+)
+
+INTO OUTFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/ExportFromDBWasteCollectionSummary.csv'
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n';      
 
 
 
