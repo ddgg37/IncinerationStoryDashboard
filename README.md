@@ -1,4 +1,4 @@
-# England Recycling Waste Analysis (2023–2025) - Tableau Project
+# London residual waste treatment (2015 - 2025)
 
 An interactive Tableau data story exploring England's local authority recycling data — what actually gets recycled, which trends are genuine versus seasonal, and how performance varies once population is accounted for.
 
