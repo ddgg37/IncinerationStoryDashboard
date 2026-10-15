@@ -1,6 +1,12 @@
 # London residual waste treatment (2015 - 2025)
 
-An interactive Tableau data story exploring England's local authority recycling data — what actually gets recycled, which trends are genuine versus seasonal, and how performance varies once population is accounted for.
+I decided to build a dashboard related to recycling and waste management in England. This is an interesting topic for me as people do not care or value the cost of managing the waste we throw away. 
+
+## Challenge I faced with data
+
+Defra has an extensive datasets, you can find quite old data; this allowed me to see the progression in few parts in the data. The fact the data is quite complex can bring you to a quite extensive dashboard,
+
+I was expecting to find a straight forward data regarding recycling rates but I ended up realising that this was getting quite complex for the type of dashboard I wanted to build. In the end I decided to focus on incineration and landfill inside residual waste management area.
 
 ## Overview
 
