@@ -6,26 +6,16 @@
 
   Although it sounds surprising nowadays there is not much information about the waste treatment process, unless we search in internet. From my point of view, public services should inform and educate the population about their impact in waste management with their daily decisions and this is why I decided to analyse the data from Defra and do this dashboard.
 
-  I started trying to cover all parts of waste management but I realise it was too extensive and this is why I simplified to incineration/landfill topic. Surprisingly, I was disappointed to find out that recycling is not doing well and this is the reason why incineration and landfill are taking more importance. The only thing I can say is that there is not perfect solution for a complex problem like this one.
+  I started trying to cover all parts of waste management but I realise it was too extensive and this is why I decided to simplify it. Surprisingly, I was disappointed to find out that recycling is not doing well and this is the reason why incineration and landfill are taking more importance. The only thing I can say is that there is not perfect solution for a complex problem like this one.
 
 ## Challenge I faced with data
 
-  Defra has extensive datasets, you can find quite detailed data from previous years; this allowed me to see the progression. The fact the data is quite complex can bring you to a quite extensive dashboard,
+  Defra has extensive datasets, you can find quite detailed data from previous years. The fact the data is quite complex can bring you to a quite extensive dashboard, my fear was I would not be able to communicate clearly about the waste management problem.
 
   I decided to make two decisions so that I could simplify the data to get a more understandable dashboard:
   
-  - I download the last ten years of waste data from Defra to analyse the waste that ended up or pass through incineration and landfill facilities.
-  - Focus on London districts only 
-
-## Overview
-
-Local authorities across England report waste collection and processing data every quarter through WasteDataFlow. This project takes two years of that raw data (2023–2025, ~624,000 records across 321 authorities) and turns it into a guided data story, built to answer three questions a simple recycling-rate headline number can't:
-
-What actually dominates recycling by volume, and how "clean" is that recycling once you look past the label?
-Is a change in the data a real trend, or just the seasons turning?
-
-How does recycling performance really compare between authorities, once you stop letting population size distort the picture?
-Tech Stack
+  - I download the last ten years of waste data from Defra. This allowed me to analyse the progressions of waste that ended up or pass through incineration and landfill facilities.
+  - Focus on London districts only, as I am a London habitant, I though it would be good to focus in the city I live.  
 
 ## Technology used for this project
 
