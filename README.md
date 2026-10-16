@@ -1,12 +1,21 @@
 # London residual waste treatment (2015 - 2025)
 
-I decided to build a dashboard related to recycling and waste management in England. This is an interesting topic for me as people do not care or value the cost of managing the waste we throw away. 
+  I decided to build a dashboard related to recycling and waste management in England. This is an interesting topic for me as people do not care or value the cost of managing the waste we throw away. The reality is that we need to start taking seriously what we throw away and make the effort to do our best to separate different type of waste like recycling, composting or rubbish.  
+
+## Recycling has become far too complex topic
+
+  Although it sounds surprising nowadays there is not much information about the waste treatment process, unless we search in internet. From my point of view, public services should inform and educate the population about their impact in waste management with their daily decisions and this is why I decided to analyse the data from Defra and do this dashboard.
+
+  I started trying to cover all parts of waste management but I realise it was too extensive and this is why I simplified to incineration/landfill topic. Surprisingly, I was disappointed to find out that recycling is not doing well and this is the reason why incineration and landfill are taking more importance. The only thing I can say is that there is not perfect solution for a complex problem like this one.
 
 ## Challenge I faced with data
 
-Defra has an extensive datasets, you can find quite old data; this allowed me to see the progression in few parts in the data. The fact the data is quite complex can bring you to a quite extensive dashboard,
+  Defra has extensive datasets, you can find quite detailed data from previous years; this allowed me to see the progression. The fact the data is quite complex can bring you to a quite extensive dashboard,
 
-I was expecting to find a straight forward data regarding recycling rates but I ended up realising that this was getting quite complex for the type of dashboard I wanted to build. In the end I decided to focus on incineration and landfill inside residual waste management area.
+  I decided to make two decisions so that I could simplify the data to get a more understandable dashboard:
+  
+  - I download the last ten years of waste data from Defra to analyse the waste that ended up or pass through incineration and landfill facilities.
+  - Focus on London districts only 
 
 ## Overview
 
